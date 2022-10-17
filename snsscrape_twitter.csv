@@ -1,0 +1,173 @@
+!pip3 install snscrape
+
+snscrape adalah scraper untuk layanan jejaring sosial (SNS). Itu mengikis hal-hal seperti profil pengguna, tagar, atau pencarian dan mengembalikan item yang ditemukan, mis. pos-pos yang relevan. Layanan berikut saat ini didukung: Facebook: profil pengguna, grup, dan komunitas (alias pos pengunjung)
+
+pip install langdetect
+
+langdetect adalah implementasi ulang pustaka deteksi bahasa Google dari Java ke Python.
+
+import snscrape.modules.twitter as sntwitter
+import json
+from langdetect import detect
+
+PROSES INI BERMANFAAT UNTUK MENGIMPOR MODUL SNSCRAPE UNTUK MENANGANI DATA YANG KITA DAPATKAN DARI TWITTER
+
+keywords=['Sepak bola indonesia']
+start="2022–10–01"
+end ="2022–10–31"
+max_num=10
+fname='tweet.json' 
+languages=['id']
+
+Memilih kata kunci di Twitter
+
+import pandas as pd
+datatw=[]
+
+Membuat Variabel "datatw" untuk, menampilkan hasil data yang  diambil di Twitter
+
+for keyword in keywords:
+   
+    for i, tweet in enumerate (sntwitter.TwitterSearchScraper(f'{keyword} ').get_items()):
+        
+        try:
+            lan=detect(tweet.content)
+        except:
+            lan='error'
+        if i == max_num:
+            break
+        if lan in languages:
+            data = {'id': tweet.id, 'username':tweet.username, 'date': tweet.date, 'text': tweet.content,'url':tweet.url}
+           # print(data)
+            datatw.append(tweet.content)
+            with open(fname, 'a+', encoding='utf-8') as f:
+                line = json.dumps(data, ensure_ascii=False,default=str)
+                #print(line)
+                f.write(line)
+                f.write('\n')
+
+Kemudian mulai crawling
+
+datatw
+
+Menampilkan datatw yang tersimpan di csv
+
+!pip install Sastrawi
+
+Kemudian install sastrawi<br>
+Python Sastrawi adalah pengembangan dari proyek PHP Sastrawi. Python Sastrawi merupakan library sederhana yang dapat mengubah kata berimbuhan bahasa Indonesia menjadi bentuk dasarnya. Sastrawi juga dapat diinstal melalui “pip”.
+
+import re
+import string
+from Sastrawi.Stemmer.StemmerFactory import StemmerFactory# create stemmer
+factory = StemmerFactory()
+stemmer = factory.create_stemmer()# stemming process
+# import StopWordRemoverFactory class
+from Sastrawi.StopWordRemover.StopWordRemoverFactory import StopWordRemoverFactory
+factory = StopWordRemoverFactory()
+stopword = factory.create_stop_word_remover()
+documents_clean=[]
+
+for d in datatw:
+    outputstem= stemmer.stem(d)
+    d= stopword.remove(outputstem)
+    # Remove Unicode
+    document_test = re.sub(r'[^\x00-\x7F]+', ' ', d)
+    # Remove Mentions
+    document_test = re.sub(r'@\w+', '', document_test)
+    # Lowercase the document
+    document_test = document_test.lower()
+    # Remove punctuations
+    document_test = re.sub(r'[%s]' % re.escape(string.punctuation), ' ', document_test)
+    # Lowercase the numbers
+    document_test = re.sub(r'[0-9]', '', document_test)
+    # Remove the doubled space
+    outputstop = re.sub(r'\s{2,}', ' ', document_test)
+    documents_clean.append(outputstop)
+
+Proses Stemming
+Proses stemming adalah proses mengubah kata berimbuhan menjadi kata dasar. Misalnya kata memakan menjadi makan,
+
+documents_clean[0:5]
+
+documents_clean untuk menghapus semua karakter tidak dapat dicetak dari teks
+
+from sklearn.feature_extraction.text import TfidfVectorizer
+import pandas as pd
+tfidfvectorizer = TfidfVectorizer(analyzer='word')
+tfidf_wm = tfidfvectorizer.fit_transform(documents_clean)
+tfidf_tokens = tfidfvectorizer.get_feature_names()
+
+tf-idf digunakan untuk mengklasifikasikan dokumen, peringkat di mesin pencari. tf: term frequency (jumlah kata yang ada dalam dokumen dari kosakatanya sendiri), idf: frekuensi dokumen terbalik (pentingnya kata untuk setiap dokumen).
+
+from sklearn.feature_extraction.text import CountVectorizer 
+import matplotlib.pyplot as plt
+import numpy as np # linear algebra
+import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
+cv = CountVectorizer()
+words = cv.fit_transform(documents_clean)
+sum_words = words.sum(axis=0)
+
+
+words_freq = [(word, sum_words[0, idx]) for word, idx in cv.vocabulary_.items()]
+words_freq = sorted(words_freq, key = lambda x: x[1], reverse = True)
+frequency = pd.DataFrame(words_freq, columns=['word', 'freq'])
+
+color = plt.cm.twilight(np.linspace(0, 1, 20))
+frequency.head(20).plot(x='word', y='freq', kind='bar', figsize=(15, 7), color = color)
+plt.title("Most Frequently Occuring Words - Top 20")
+
+list daftar kata-kata yang paling umum dari corpus teks menggunakan Scikit-Learn
+
+from sklearn.cluster import KMeans
+true_k = 3
+model = KMeans(n_clusters=true_k, init='k-means++', max_iter=100, n_init=1)
+model.fit(words)
+
+Clustering Algoritma (K-Means) memiliki tujuan untuk meminimalisasikan fungsi objective yang telah di set dalam proses clustering. Tujuan tersebut dilakukan dengan cara meminimalikan variasi data yang ada didalam cluster dan memaksimalikan variasi data yang ada di cluster lainnya.
+
+order_centroids = model.cluster_centers_.argsort()[:, ::-1]
+terms = cv.get_feature_names()
+
+for i in range(true_k):
+    print("Cluster %d:" % i),
+    for ind in order_centroids[i, :10]:
+        print(' %s' % terms[ind]),
+    print
+
+print("\n")
+
+LAKUKAN ORDER CENTROID, UNTUK mendistribusikan HASIL UNTUK SETIAP CLUSTER
+
+print("Prediction")
+Y = cv.transform(["sepak bola"])
+prediction = model.predict(Y)
+print("Cluster number :", prediction)
+Y = cv.transform(["aremania"])
+prediction = model.predict(Y)
+print("Cluster number :", prediction)
+
+setelah melakukan cluster kita bisa juga melakukan prediction kata tersebut masuk ke cluster berapa seperti contoh dibawah ini
+
+import scipy.cluster.hierarchy as sch
+X = cv.fit_transform(documents_clean).todense()
+dendrogram = sch.dendrogram(sch.linkage(X, method = 'ward',metric='euclidean'),orientation="top")
+plt.title('Dendrogram')
+plt.xlabel('Jarak Ward')
+plt.ylabel('Nomor Dokumen')
+plt.show()
+
+lalu kita buat diagram/dendogram menggunakan method "ward" seperti ini
+
+import scipy.cluster.hierarchy as sch
+X = cv.fit_transform(documents_clean).todense()
+dendrogram = sch.dendrogram(sch.linkage(X, method = 'average',metric='euclidean'),orientation="right")
+plt.title('Dendrogram')
+plt.xlabel('Jarak Rerata')
+plt.ylabel('Nomor Dokumen')
+plt.show()
+
+Fungsi-fungsi ini memotong pengelompokan hierarki menjadi pengelompokan datar atau menemukan akar hutan yang dibentuk oleh potongan dengan memberikan id cluster datar dari setiap pengamatan.
+
+https://www.freecodecamp.org/news/python-web-scraping-tutorial/
+https://medium.com/dataseries/how-to-scrape-millions-of-tweets-using-snscrape-195ee3594721
